@@ -25,9 +25,6 @@ import java.util.*;
 
 @Configuration
 public class ShiroConfig {
-
-    @Autowired
-    DBSessionDao dbSessionDao;
     @Resource
     LettuceConnectionFactory lettuceConnectionFactory;
 
@@ -84,7 +81,7 @@ public class ShiroConfig {
 
     }
 
-    @Bean
+    @Bean("securityManager")
     public SecurityManager securityManager() {
         DefaultWebSecurityManager defaultSecurityManager = new DefaultWebSecurityManager();
         defaultSecurityManager.setRealms(Arrays.asList(phoneCodeRealm, scanCodeRealm, userPasswordRealm));
