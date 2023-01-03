@@ -1,7 +1,10 @@
 package cn.wildfirechat.app.shiro;
 
 
+import io.lettuce.core.internal.HostAndPort;
 import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.mgt.DefaultSessionStorageEvaluator;
+import org.apache.shiro.mgt.DefaultSubjectDAO;
 import org.apache.shiro.mgt.SecurityManager;
 import org.apache.shiro.session.mgt.SessionManager;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
@@ -9,20 +12,24 @@ import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
 import org.apache.shiro.web.servlet.Cookie;
 import org.apache.shiro.web.servlet.ShiroHttpSession;
 import org.apache.shiro.web.servlet.SimpleCookie;
+import org.crazycake.shiro.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.util.StringUtils;
 
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import javax.annotation.Resource;
+import java.util.*;
 
 @Configuration
 public class ShiroConfig {
 
     @Autowired
     DBSessionDao dbSessionDao;
+    @Resource
+    LettuceConnectionFactory lettuceConnectionFactory;
 
     @Autowired
     private PhoneCodeRealm phoneCodeRealm;
@@ -81,10 +88,10 @@ public class ShiroConfig {
     public SecurityManager securityManager() {
         DefaultWebSecurityManager defaultSecurityManager = new DefaultWebSecurityManager();
         defaultSecurityManager.setRealms(Arrays.asList(phoneCodeRealm, scanCodeRealm, userPasswordRealm));
+
         ShiroSessionManager sessionManager = new ShiroSessionManager();
         sessionManager.setGlobalSessionTimeout(Long.MAX_VALUE);
-        sessionManager.setSessionDAO(dbSessionDao);
-
+        sessionManager.setSessionDAO(redisSessionDAO());
         Cookie cookie = new SimpleCookie(ShiroHttpSession.DEFAULT_SESSION_ID_NAME);
         if (All_Client_Support_SSL) {
             cookie.setSameSite(Cookie.SameSiteOptions.NONE);
@@ -100,5 +107,32 @@ public class ShiroConfig {
         defaultSecurityManager.setSessionManager(sessionManager);
         SecurityUtils.setSecurityManager(defaultSecurityManager);
         return defaultSecurityManager;
+    }
+
+    public RedisSessionDAO redisSessionDAO() {
+        RedisSessionDAO redisSessionDAO = new RedisSessionDAO();
+        redisSessionDAO.setRedisManager(redisManager());
+        return redisSessionDAO;
+    }
+
+    /**
+     * 配置shiro redisManager
+     * 使用的是shiro-redis开源插件
+     *
+     * @return
+     */
+    @Bean
+    public IRedisManager redisManager() {
+        IRedisManager manager;
+        RedisManager redisManager = new RedisManager();
+        redisManager.setHost(lettuceConnectionFactory.getHostName());
+        redisManager.setPort(lettuceConnectionFactory.getPort());
+        redisManager.setDatabase(lettuceConnectionFactory.getDatabase());
+        redisManager.setTimeout(0);
+        if (!StringUtils.isEmpty(lettuceConnectionFactory.getPassword())) {
+            redisManager.setPassword(lettuceConnectionFactory.getPassword());
+        }
+        manager = redisManager;
+        return manager;
     }
 }
