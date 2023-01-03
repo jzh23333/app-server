@@ -85,7 +85,13 @@ public class ShiroConfig {
     public SecurityManager securityManager() {
         DefaultWebSecurityManager defaultSecurityManager = new DefaultWebSecurityManager();
         defaultSecurityManager.setRealms(Arrays.asList(phoneCodeRealm, scanCodeRealm, userPasswordRealm));
+        defaultSecurityManager.setSessionManager(sessionManager());
+        defaultSecurityManager.setCacheManager(redisCacheManager());
+        SecurityUtils.setSecurityManager(defaultSecurityManager);
+        return defaultSecurityManager;
+    }
 
+    private ShiroSessionManager sessionManager() {
         ShiroSessionManager sessionManager = new ShiroSessionManager();
         sessionManager.setGlobalSessionTimeout(Long.MAX_VALUE);
         sessionManager.setSessionDAO(redisSessionDAO());
@@ -100,16 +106,29 @@ public class ShiroConfig {
         sessionManager.setSessionIdCookie(cookie);
         sessionManager.setSessionIdCookieEnabled(true);
         sessionManager.setSessionIdUrlRewritingEnabled(true);
-
-        defaultSecurityManager.setSessionManager(sessionManager);
-        SecurityUtils.setSecurityManager(defaultSecurityManager);
-        return defaultSecurityManager;
+        return sessionManager;
     }
 
     public RedisSessionDAO redisSessionDAO() {
         RedisSessionDAO redisSessionDAO = new RedisSessionDAO();
         redisSessionDAO.setRedisManager(redisManager());
         return redisSessionDAO;
+    }
+
+    /**
+     * cacheManager 缓存 redis实现
+     * 使用的是shiro-redis开源插件
+     *
+     * @return
+     */
+    public RedisCacheManager redisCacheManager() {
+        RedisCacheManager redisCacheManager = new RedisCacheManager();
+        redisCacheManager.setRedisManager(redisManager());
+        //redis中针对不同用户缓存(此处的id需要对应user实体中的id字段,用于唯一标识)
+        redisCacheManager.setPrincipalIdFieldName("id");
+        //用户权限信息缓存时间
+        redisCacheManager.setExpire(200000);
+        return redisCacheManager;
     }
 
     /**
